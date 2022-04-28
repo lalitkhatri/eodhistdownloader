@@ -14,6 +14,8 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
+import util.downloader.mapper.IMapper;
+
 @SuppressWarnings({"unchecked","rawtypes"})
 @Component
 public class PhoenixDAO {
@@ -24,7 +26,8 @@ public class PhoenixDAO {
 	
 	public void execute(String sql,Object ... a ) throws SQLException{
 		try(Connection con = getConnection();
-				PreparedStatement ps = con.prepareStatement(sql);){
+				PreparedStatement ps = con.prepareStatement(sql);)
+		{
 			setParameters(ps, a);
 			ps.setQueryTimeout(180);
 			ps.execute();
@@ -35,7 +38,8 @@ public class PhoenixDAO {
 	public List<Map<String,Object>> executeQuery(String sql, Object ... a) throws SQLException {
 		List<Map<String,Object>> result = new ArrayList<>();
 		try(Connection con = getConnection();
-				PreparedStatement ps = con.prepareStatement(sql);){
+				PreparedStatement ps = con.prepareStatement(sql);)
+		{
 			setParameters(ps, a);
 			ps.setQueryTimeout(180);
 			ResultSet rs = ps.executeQuery();
@@ -53,10 +57,27 @@ public class PhoenixDAO {
 		return result;
 	}
 	
+	public List executeQuery(String sql,IMapper mapper, Object ... a) throws SQLException {
+		List result = new ArrayList<>();
+		try(Connection con = getConnection();
+				PreparedStatement ps = con.prepareStatement(sql);)
+		{
+			setParameters(ps, a);
+			ps.setQueryTimeout(180);
+			ResultSet rs = ps.executeQuery();
+			while(rs.next()) {
+				result.add(mapper.mapRow(rs));
+			}
+			rs.close();
+		}
+		return result;
+	}
+
 	public int executeUpdate(String sql,Object ... a) throws SQLException{
 		int count=0;
 		try(Connection con = getConnection();
-				PreparedStatement ps = con.prepareStatement(sql);){
+				PreparedStatement ps = con.prepareStatement(sql);)
+		{
 			setParameters(ps, a);
 			ps.setQueryTimeout(180);
 			count = ps.executeUpdate();
