@@ -29,12 +29,18 @@ public class TickerController {
 	@Autowired
 	private PhoenixDAO dao;
 	
+	private static final String tickerCountSQL = "select exchange,count(1) from GLOBALDATA.TICKER group by exchange order by exchange";
 	private static final String tickerListSQL = "select * from GLOBALDATA.TICKER where EXCHANGE=?";
 	private static final String tickerInfoSQL = "select * from GLOBALDATA.TICKER where EXCHANGE=? and SYMBOL=?";
 	private static final String deleteTickerInfoSQL = "delete from GLOBALDATA.TICKER where EXCHANGE=? and SYMBOL=?";
 	private static final String trackedTickerListSQL = "select * from GLOBALDATA.TICKER where TRACK='Y'";
 	private static final String loadTickerSQL = "upsert into GLOBALDATA.TICKER (SYMBOL,NAME,EXCHANGE,COUNTRY,CURRENCY,TYPE,TRACK) values (?,?,?,?,?,?,?) ";
 	private static final String trackUntrackTickerSQL = "upsert into GLOBALDATA.TICKER (EXCHANGE,SYMBOL,TRACK) values (?,?,?) ";
+	
+	@GetMapping("/count")
+	public List getTickerCount() throws Exception {
+		return dao.executeQuery(tickerCountSQL);
+	}
 	
 	@GetMapping("/list/{exchange}")
 	public List getTickerList(@PathVariable("exchange") String exchange) throws Exception {
