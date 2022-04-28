@@ -45,6 +45,7 @@ public class EODDataController {
 		for (Ticker a : ticker) {
 			count += loadData(exchange,a.getCode(),"d",a.getCountry());
 //			System.out.println(exchange.toUpperCase()+"-"+a.getCode()+"-"+a.getCountry());
+			Thread.sleep(100); //To throttle request to api - max allowed 1000 per min
 		}
 		return "Total Data Loaded for "+exchange+" - " + count;
 		
