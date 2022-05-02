@@ -38,7 +38,7 @@ public class EODDataController {
 	
 	private final ExecutorService executor = Executors.newFixedThreadPool(10);
 	
-	private static final String countEODData = "select exchange, count(distinct symbol) as sym_cnt, count(1) as data_cnt from eqdata group by exchange";
+	private static final String countEODData = "select exchange, count(distinct symbol) as sym_cnt, count(1) as data_cnt from GLOBALDATA.EQDATA group by exchange";
 		
 	private static final String loadEODData = "upsert into GLOBALDATA.EQDATA (EXCHANGE, SYMBOL,TRADEDATE,FREQ,OPENPX,CLOSEPX,HIGH,LOW,PREVCLOSE,TOTTRDQTY) "
 			+ "VALUES (?,?,?,?,?,?,?,?,?,?)  ";
