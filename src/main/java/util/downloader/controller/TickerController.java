@@ -29,7 +29,7 @@ public class TickerController {
 	@Autowired
 	private PhoenixDAO dao;
 	
-	private static final String tickerCountSQL = "select exchange,count(1) from GLOBALDATA.TICKER group by exchange order by exchange";
+	private static final String tickerCountSQL = "select exchange,count(1) from GLOBALDATA.TICKER where TYPE in ('Common Stock','INDEX', 'Currency' ) group by exchange order by exchange";
 	private static final String tickerListSQL = "select * from GLOBALDATA.TICKER where EXCHANGE=?";
 	private static final String tickerInfoSQL = "select * from GLOBALDATA.TICKER where EXCHANGE=? and SYMBOL=?";
 	private static final String deleteTickerInfoSQL = "delete from GLOBALDATA.TICKER where EXCHANGE=? and SYMBOL=?";

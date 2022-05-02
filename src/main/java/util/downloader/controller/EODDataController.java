@@ -1,9 +1,12 @@
 package util.downloader.controller;
 
+import static util.downloader.util.Constants.API_TOKEN;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -22,8 +25,6 @@ import util.downloader.mapper.TickerMapper;
 import util.downloader.model.EODData;
 import util.downloader.model.Ticker;
 
-import static util.downloader.util.Constants.API_TOKEN;
-
 @SuppressWarnings("unchecked")
 @RestController
 @RequestMapping("/eoddata")
@@ -35,11 +36,11 @@ public class EODDataController {
 	@Autowired
 	private TickerMapper tickerMapper;
 	
-	private final ExecutorService executor = Executors.newFixedThreadPool(5);
+	private final ExecutorService executor = Executors.newFixedThreadPool(10);
 	
 	private static final String loadEODData = "upsert into GLOBALDATA.EQDATA (EXCHANGE, SYMBOL,TRADEDATE,FREQ,OPENPX,CLOSEPX,HIGH,LOW,PREVCLOSE,TOTTRDQTY) "
 			+ "VALUES (?,?,?,?,?,?,?,?,?,?)  ";
-	private static final String tickerListSQL = "select * from GLOBALDATA.TICKER where EXCHANGE=? and TYPE in ('Common Stock','INDEX', 'Currency' ) and symbol >= 'ASAI'";
+	private static final String tickerListSQL = "select * from GLOBALDATA.TICKER where EXCHANGE=? and TYPE in ('Common Stock','INDEX', 'Currency' )";
 	
 	@GetMapping("/load/{exchange}")
 	public String loadData(@PathVariable("exchange") String exchange) throws Exception  {
@@ -110,7 +111,7 @@ private class EODDataLoader implements Runnable{
 				prevclose = record.getAdjusted_close();
 				data.add(row);
 			}
-			System.out.println("Loading data for "+symbol+"."+exchange+" - "+data.size());
+			System.out.println("Loading data for "+symbol+"."+exchange+" - "+data.size()+" - "+ Instant.now());
 			dao.executeBatch(loadEODData, data);
 		}
 		conn.disconnect();
