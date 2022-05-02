@@ -43,9 +43,14 @@ public class EODDataController {
 		int count = 0;
 		List<Ticker> ticker = dao.executeQuery(tickerListSQL, tickerMapper, exchange.toUpperCase());
 		for (Ticker a : ticker) {
-			count += loadData(exchange,a.getCode(),"d",a.getCountry());
-//			System.out.println(exchange.toUpperCase()+"-"+a.getCode()+"-"+a.getCountry());
-			Thread.sleep(100); //To throttle request to api - max allowed 1000 per min
+			try{
+				count += loadData(exchange,a.getCode(),"d",a.getCountry());
+			}
+			catch (Exception e) {
+				System.out.println("Exception while processing - "+a.getCode() + " - "+ e.getMessage());
+			}
+			System.out.println(exchange.toUpperCase()+"-"+a.getCode()+"-"+a.getCountry());
+//			Thread.sleep(20); //To throttle request to api - max allowed 1000 per min
 		}
 		return "Total Data Loaded for "+exchange+" - " + count;
 		
@@ -63,7 +68,7 @@ public class EODDataController {
 		if(country!=null && country.equals("USA")) {
 			exch="US";
 		}
-		URL url = new URL("https://eodhistoricaldata.com/api/eod/"+symbol+"."+exch+"?api_token="+API_TOKEN+"&period="+freq+"&fmt=json&from=2012-01-01&to=2022-04-28");
+		URL url = new URL("https://eodhistoricaldata.com/api/eod/"+symbol+"."+exch+"?api_token="+API_TOKEN+"&period="+freq+"&fmt=json&from=2012-01-01&to=2022-04-30");
 		HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 		conn.setRequestMethod("GET");
 		conn.setRequestProperty("Accept", "application/json");
