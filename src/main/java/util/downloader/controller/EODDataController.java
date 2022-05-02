@@ -108,12 +108,12 @@ private class EODDataLoader implements Runnable{
 				row[2] = record.getDate();
 				row[3] = freq.toUpperCase();
 				row[4] = record.getOpen();
-				row[5] = record.getAdjusted_close();
+				row[5] = record.getClose();
 				row[6] = record.getHigh();
 				row[7] = record.getLow();
 				row[8] = prevclose;
 				row[9] = record.getVolume();
-				prevclose = record.getAdjusted_close();
+				prevclose = record.getClose();
 				data.add(row);
 			}
 			System.out.println("Loading data for "+symbol+"."+exchange+" - "+data.size()+" - "+ Instant.now());
