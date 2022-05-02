@@ -6,6 +6,8 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,36 +35,45 @@ public class EODDataController {
 	@Autowired
 	private TickerMapper tickerMapper;
 	
+	private final ExecutorService executor = Executors.newFixedThreadPool(5);
 	
 	private static final String loadEODData = "upsert into GLOBALDATA.EQDATA (EXCHANGE, SYMBOL,TRADEDATE,FREQ,OPENPX,CLOSEPX,HIGH,LOW,PREVCLOSE,TOTTRDQTY) "
 			+ "VALUES (?,?,?,?,?,?,?,?,?,?)  ";
-	private static final String tickerListSQL = "select * from GLOBALDATA.TICKER where EXCHANGE=? and TYPE in ('Common Stock','INDEX', 'Currency' )";
+	private static final String tickerListSQL = "select * from GLOBALDATA.TICKER where EXCHANGE=? and TYPE in ('Common Stock','INDEX', 'Currency' ) and symbol >= 'ASAI'";
 	
 	@GetMapping("/load/{exchange}")
 	public String loadData(@PathVariable("exchange") String exchange) throws Exception  {
-		int count = 0;
 		List<Ticker> ticker = dao.executeQuery(tickerListSQL, tickerMapper, exchange.toUpperCase());
 		for (Ticker a : ticker) {
-			try{
-				count += loadData(exchange,a.getCode(),"d",a.getCountry());
-			}
-			catch (Exception e) {
-				System.out.println("Exception while processing - "+a.getCode() + " - "+ e.getMessage());
-			}
-			System.out.println(exchange.toUpperCase()+"-"+a.getCode()+"-"+a.getCountry());
-//			Thread.sleep(20); //To throttle request to api - max allowed 1000 per min
+			executor.execute(new EODDataLoader(exchange, a.getCode(), "d", a.getCountry()));
 		}
-		return "Total Data Loaded for "+exchange+" - " + count;
+		return "Started Data Load for "+exchange;
 		
 	}
 	
 	@GetMapping("/load/{exchange}/{symbol}")
 	public String loadData(@PathVariable("exchange") String exchange,@PathVariable("symbol") String symbol) throws Exception  {
-		int count = loadData(exchange,symbol,"d",null);
-		return "Total Data Loaded for "+symbol+"."+exchange+" - " + count;
+		executor.execute(new EODDataLoader(exchange, symbol, "d", null));
+		return "Started Data Load for "+symbol+"."+exchange;
 	}
 	
-	public int loadData(String exchange, String symbol, String freq, String country) throws Exception  {
+	
+	
+	
+private class EODDataLoader implements Runnable{
+	private final String exchange;
+	private final String symbol;
+	private final String freq;
+	private final String country;
+	
+	public EODDataLoader(String exchange, String symbol, String freq, String country) {
+		this.exchange= exchange;
+		this.symbol = symbol;
+		this.freq = freq;
+		this.country = country;
+	}
+	
+	public int loadData() throws Exception  {
 		List<Object[]> data = new ArrayList<>();
 		String exch = exchange;
 		if(country!=null && country.equals("USA")) {
@@ -99,14 +110,22 @@ public class EODDataController {
 				prevclose = record.getAdjusted_close();
 				data.add(row);
 			}
-//			System.out.println("Loading data for "+symbol+"."+exchange+" - "+data.size());
+			System.out.println("Loading data for "+symbol+"."+exchange+" - "+data.size());
 			dao.executeBatch(loadEODData, data);
 		}
 		conn.disconnect();
 		return data.size();
 	}
 	
-	
-	
+	@Override
+	public void run() {
+		try{
+			loadData();
+		}
+		catch (Exception e) {
+			System.out.println("Exception while processing - "+symbol+"."+exchange + " - "+ e.getMessage());
+		}
+	}
+}
 	
 }
