@@ -38,6 +38,8 @@ public class EODDataController {
 	
 	private final ExecutorService executor = Executors.newFixedThreadPool(10);
 	
+	private static final String countEODData = "select exchange, count(distinct symbol) as sym_cnt, count(1) as data_cnt from eqdata group by exchange";
+		
 	private static final String loadEODData = "upsert into GLOBALDATA.EQDATA (EXCHANGE, SYMBOL,TRADEDATE,FREQ,OPENPX,CLOSEPX,HIGH,LOW,PREVCLOSE,TOTTRDQTY) "
 			+ "VALUES (?,?,?,?,?,?,?,?,?,?)  ";
 	private static final String tickerListSQL = "select * from GLOBALDATA.TICKER where EXCHANGE=? and TYPE in ('Common Stock','INDEX', 'Currency' )";
@@ -58,7 +60,10 @@ public class EODDataController {
 		return "Started Data Load for "+symbol+"."+exchange;
 	}
 	
-	
+	@GetMapping("/count")
+	public List getTickerCount() throws Exception {
+		return dao.executeQuery(countEODData);
+	}
 	
 	
 private class EODDataLoader implements Runnable{
