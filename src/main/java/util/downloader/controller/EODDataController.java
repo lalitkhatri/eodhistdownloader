@@ -48,7 +48,7 @@ public class EODDataController {
 	public String loadData(@PathVariable("exchange") String exchange) throws Exception  {
 		List<Ticker> ticker = dao.executeQuery(tickerListSQL, tickerMapper, exchange.toUpperCase());
 		for (Ticker a : ticker) {
-			executor.execute(new EODDataLoader(exchange, a.getCode(), "d", a.getCountry()));
+			executor.execute(new EODDataLoader(exchange.toUpperCase(), a.getCode(), "d", a.getCountry()));
 		}
 		return "Started Data Load for "+exchange;
 		
@@ -56,7 +56,7 @@ public class EODDataController {
 	
 	@GetMapping("/load/{exchange}/{symbol}")
 	public String loadData(@PathVariable("exchange") String exchange,@PathVariable("symbol") String symbol) throws Exception  {
-		executor.execute(new EODDataLoader(exchange, symbol, "d", null));
+		executor.execute(new EODDataLoader(exchange.toUpperCase(), symbol.toUpperCase(), "d", null));
 		return "Started Data Load for "+symbol+"."+exchange;
 	}
 	
