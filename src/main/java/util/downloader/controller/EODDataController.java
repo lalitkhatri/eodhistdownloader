@@ -41,8 +41,8 @@ public class EODDataController {
 	
 	private static final String countEODData = "select exchange, count(distinct symbol) as sym_cnt, count(1) as data_cnt from GLOBALDATA.EQDATA group by exchange";
 		
-	private static final String loadEODData = "upsert into GLOBALDATA.EQDATA (EXCHANGE, SYMBOL,TRADEDATE,FREQ,OPENPX,CLOSEPX,HIGH,LOW,PREVCLOSE,TOTTRDQTY) "
-			+ "VALUES (?,?,?,?,?,?,?,?,?,?)  ";
+	private static final String loadEODData = "upsert into GLOBALDATA.EQDATA (EXCHANGE, SYMBOL,TRADEDATE,FREQ,OPENPX,CLOSEPX,HIGH,LOW,PREVCLOSE,TOTTRDQTY,ADJCLOSEPX) "
+			+ "VALUES (?,?,?,?,?,?,?,?,?,?,?)  ";
 	private static final String tickerListSQL = "select * from GLOBALDATA.TICKER where EXCHANGE=? and TYPE in ('Common Stock','INDEX', 'Currency' )";
 	
 	private static final String loadSplitsData = "upsert into GLOBALDATA.SPLITS (EXCHANGE, SYMBOL,TRADEDATE,RATIO) VALUES (?,?,?,?) ";
@@ -87,7 +87,8 @@ private class EODDataLoader implements Runnable{
 	private int loadData() throws Exception  {
 		List<Object[]> data = new ArrayList<>();
 		
-		URL url = new URL("https://eodhistoricaldata.com/api/eod/"+symbol+"."+exch+"?api_token="+API_TOKEN+"&period="+freq+"&fmt=json&from=2012-01-01&to=2022-04-30");
+		URL url = new URL("https://eodhistoricaldata.com/api/eod/"+symbol+"."+exch+"?api_token="+API_TOKEN+"&period="+freq+"&fmt=json&from=2012-01-01&to=2022-05-03");
+//		System.out.println(url.toString());
 		HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 		conn.setRequestMethod("GET");
 		conn.setRequestProperty("Accept", "application/json");
@@ -104,9 +105,9 @@ private class EODDataLoader implements Runnable{
 			Float prevclose = null;
 			for (int i = 0; i < recordArray.length; i++) {
 				EODData record = recordArray[i];
-				Object[] row = new Object[10];
-				row[0] = exchange;
-				row[1] = symbol;
+				Object[] row = new Object[11];
+				row[0] = exchange.toUpperCase();
+				row[1] = symbol.toUpperCase();
 				row[2] = record.getDate();
 				row[3] = freq.toUpperCase();
 				row[4] = record.getOpen();
@@ -115,11 +116,14 @@ private class EODDataLoader implements Runnable{
 				row[7] = record.getLow();
 				row[8] = prevclose;
 				row[9] = record.getVolume();
+				row[10] = record.getAdjusted_close();
 				prevclose = record.getClose();
 				data.add(row);
 			}
 //			System.out.println("Loading data for "+symbol+"."+exchange+" - "+data.size()+" - "+ Instant.now());
-			dao.executeBatch(loadEODData, data);
+			if(data.size()>0) {
+				dao.executeBatch(loadEODData, data);
+			}
 		}
 		conn.disconnect();
 		return data.size();
@@ -160,13 +164,15 @@ private class EODDataLoader implements Runnable{
 		for (int i = 0; i < recordArray.length; i++) {
 			SplitData record = recordArray[i];
 			Object[] row = new Object[4];
-			row[0] = exchange;
-			row[1] = symbol;
+			row[0] = exchange.toUpperCase();
+			row[1] = symbol.toUpperCase();
 			row[2] = record.getDate();
 			row[3] = record.getSplit();
 			data.add(row);
 		}
-		dao.executeBatch(loadSplitsData, data);
+		if(data.size()>0) {
+			dao.executeBatch(loadSplitsData, data);
+		}
 		conn.disconnect();
 	}
 }
