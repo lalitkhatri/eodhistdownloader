@@ -23,6 +23,7 @@ import com.google.gson.Gson;
 import util.downloader.dao.PhoenixDAO;
 import util.downloader.mapper.TickerMapper;
 import util.downloader.model.EODData;
+import util.downloader.model.SplitData;
 import util.downloader.model.Ticker;
 
 @SuppressWarnings("unchecked")
@@ -43,6 +44,9 @@ public class EODDataController {
 	private static final String loadEODData = "upsert into GLOBALDATA.EQDATA (EXCHANGE, SYMBOL,TRADEDATE,FREQ,OPENPX,CLOSEPX,HIGH,LOW,PREVCLOSE,TOTTRDQTY) "
 			+ "VALUES (?,?,?,?,?,?,?,?,?,?)  ";
 	private static final String tickerListSQL = "select * from GLOBALDATA.TICKER where EXCHANGE=? and TYPE in ('Common Stock','INDEX', 'Currency' )";
+	
+	private static final String loadSplitsData = "upsert into GLOBALDATA.SPLITS (EXCHANGE, SYMBOL,TRADEDATE,RATIO) VALUES (?,?,?,?) ";
+			
 	
 	@GetMapping("/load/{exchange}")
 	public String loadData(@PathVariable("exchange") String exchange) throws Exception  {
@@ -71,6 +75,7 @@ private class EODDataLoader implements Runnable{
 	private final String symbol;
 	private final String freq;
 	private final String country;
+	private String exch ;
 	
 	public EODDataLoader(String exchange, String symbol, String freq, String country) {
 		this.exchange= exchange;
@@ -79,12 +84,9 @@ private class EODDataLoader implements Runnable{
 		this.country = country;
 	}
 	
-	public int loadData() throws Exception  {
+	private int loadData() throws Exception  {
 		List<Object[]> data = new ArrayList<>();
-		String exch = exchange;
-		if(country!=null && country.equals("USA")) {
-			exch="US";
-		}
+		
 		URL url = new URL("https://eodhistoricaldata.com/api/eod/"+symbol+"."+exch+"?api_token="+API_TOKEN+"&period="+freq+"&fmt=json&from=2012-01-01&to=2022-04-30");
 		HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 		conn.setRequestMethod("GET");
@@ -116,7 +118,7 @@ private class EODDataLoader implements Runnable{
 				prevclose = record.getClose();
 				data.add(row);
 			}
-			System.out.println("Loading data for "+symbol+"."+exchange+" - "+data.size()+" - "+ Instant.now());
+//			System.out.println("Loading data for "+symbol+"."+exchange+" - "+data.size()+" - "+ Instant.now());
 			dao.executeBatch(loadEODData, data);
 		}
 		conn.disconnect();
@@ -126,11 +128,46 @@ private class EODDataLoader implements Runnable{
 	@Override
 	public void run() {
 		try{
+			if(country!=null && country.equals("USA")) {
+				exch="US";
+			}
+			else {
+				exch = exchange;
+			}
+			getSplitData();
 			loadData();
 		}
 		catch (Exception e) {
 			System.out.println("Exception while processing - "+symbol+"."+exchange + " - "+ e.getMessage());
 		}
+	}
+	
+	private void getSplitData() throws Exception {
+		List<Object[]> data = new ArrayList<>();
+		URL url = new URL("https://eodhistoricaldata.com/api/splits/"+symbol+"."+exch+"?api_token="+API_TOKEN+"&fmt=json");
+		HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+		conn.setRequestMethod("GET");
+		conn.setRequestProperty("Accept", "application/json");
+		if (conn.getResponseCode() != 200) {
+			throw new RuntimeException("Failed : HTTP error code : "+ conn.getResponseCode());
+		}
+
+		BufferedReader br = new BufferedReader(new InputStreamReader((conn.getInputStream())));
+
+		String output = br.readLine();
+		Gson gson = new Gson();
+		SplitData recordArray[] =  gson.fromJson(output, SplitData[].class);
+		for (int i = 0; i < recordArray.length; i++) {
+			SplitData record = recordArray[i];
+			Object[] row = new Object[4];
+			row[0] = exchange;
+			row[1] = symbol;
+			row[2] = record.getDate();
+			row[3] = record.getSplit();
+			data.add(row);
+		}
+		dao.executeBatch(loadSplitsData, data);
+		conn.disconnect();
 	}
 }
 	
