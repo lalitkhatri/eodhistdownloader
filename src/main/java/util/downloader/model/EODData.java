@@ -1,7 +1,10 @@
 package util.downloader.model;
 
 public class EODData {
+	private String exchange;
+	private String code;
 	private String date;
+	private String freq;
 	private Float open;
 	private Float high;
 	private Float low;
@@ -9,16 +12,22 @@ public class EODData {
 	private Float adjusted_close;
 	private Long volume;
 	
-	public EODData(String date, Float open, Float high, Float low, Float close, Float adjusted_close, Long volume) {
-		this.date = date;
-		this.open = open;
-		this.high = high;
-		this.low = low;
-		this.close = close;
-		this.adjusted_close = adjusted_close;
-		this.volume = volume;
+	public String getExchange() {
+		return exchange;
 	}
-
+	
+	public void setExchange(String exchange) {
+		this.exchange = exchange;
+	}
+	
+	public String getCode() {
+		return code;
+	}
+	
+	public void setCode(String code) {
+		this.code = code;
+	}
+	
 	public String getDate() {
 		return date;
 	}
@@ -27,6 +36,14 @@ public class EODData {
 		this.date = date;
 	}
 
+	public String getFreq() {
+		return freq;
+	}
+	
+	public void setFreq(String freq) {
+		this.freq = freq;
+	}
+	
 	public Float getOpen() {
 		return open;
 	}

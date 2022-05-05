@@ -35,6 +35,14 @@ public abstract class AbstractMapper<T> implements IMapper<T>{
 		return val;
 	}
 	
+	protected Long safeGetLong(ResultSet rs, String colName) throws SQLException {
+		Long val = null;
+		if(metadata.containsKey(colName)) {
+			val = rs.getLong(colName);
+		}
+		return val;
+	}
+	
 	protected Boolean safeGetBoolean(ResultSet rs, String colName) throws SQLException {
 		Boolean val = false;
 		if(metadata.containsKey(colName)) {
