@@ -58,10 +58,11 @@ public class EODDataController {
 	@GetMapping("/load/{exchange}")
 	public String loadData(@PathVariable("exchange") String exchange, 
 			@RequestParam(required = false, defaultValue = "2012-01-01") String from, 
-			@RequestParam(required = false, defaultValue = "2032-05-01") String to ) throws Exception  {
+			@RequestParam(required = false, defaultValue = "2032-05-01") String to,
+			@RequestParam(required = false, defaultValue = "d") String freq) throws Exception  {
 		List<Ticker> ticker = dao.executeQuery(tickerListSQL, tickerMapper, exchange.toUpperCase());
 		for (Ticker a : ticker) {
-			executor.execute(new EODDataLoader(exchange.toUpperCase(), a.getCode(), "d", a.getCountry(),from,to));
+			executor.execute(new EODDataLoader(exchange.toUpperCase(), a.getCode(), freq, a.getCountry(),from,to));
 		}
 		return "Started Data Load for "+exchange;
 		
@@ -70,8 +71,9 @@ public class EODDataController {
 	@GetMapping("/load/{exchange}/{symbol}")
 	public String loadData(@PathVariable("exchange") String exchange,@PathVariable("symbol") String symbol,
 			@RequestParam(required = false, defaultValue = "2012-01-01") String from, 
-			@RequestParam(required = false, defaultValue = "2032-01-01") String to  ) throws Exception  {
-		executor.execute(new EODDataLoader(exchange.toUpperCase(), symbol.toUpperCase(), "d", null,from,to));
+			@RequestParam(required = false, defaultValue = "2032-01-01") String to ,
+			@RequestParam(required = false, defaultValue = "d") String freq) throws Exception  {
+		executor.execute(new EODDataLoader(exchange.toUpperCase(), symbol.toUpperCase(), freq, null,from,to));
 		return "Started Data Load for "+symbol+"."+exchange;
 	}
 	
