@@ -10,7 +10,7 @@ public class EODData {
 	private Float low;
 	private Float close;
 	private Float adjusted_close;
-	private Long volume;
+	private Float volume;
 	
 	public String getExchange() {
 		return exchange;
@@ -84,11 +84,11 @@ public class EODData {
 		this.adjusted_close = adjusted_close;
 	}
 
-	public Long getVolume() {
+	public Float getVolume() {
 		return volume;
 	}
 
-	public void setVolume(Long volume) {
+	public void setVolume(Float volume) {
 		this.volume = volume;
 	}	
 }

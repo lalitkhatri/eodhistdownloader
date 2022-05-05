@@ -22,7 +22,6 @@ public class EODDataMapper extends AbstractMapper<EODData> {
 		record.setClose(safeGetFloat(rs, "CLOSEPX"));
 		record.setHigh(safeGetFloat(rs, "HIGH"));
 		record.setLow(safeGetFloat(rs, "LOW"));
-		record.setVolume(safeGetLong(rs, "TOTTRDQTY"));
 		if(keys!=null) {
 	    	  StringBuffer keyString = new StringBuffer();
 	    	  for (int i=0; i < keys.length;i++) {
