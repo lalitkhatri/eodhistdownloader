@@ -30,7 +30,7 @@ public class ExchangeController {
 	private PhoenixDAO dao;
 	
 	private static final String exchangeListSQL = "select * from GLOBALDATA.EXCHANGE";
-	private static final String trackExchangeListSQL = "select * from GLOBALDATA.EXCHANGE where TRACK='Y' ";
+	public static final String trackExchangeListSQL = "select * from GLOBALDATA.EXCHANGE where TRACK='Y' ";
 	private static final String exchangeInfoSQL = "select * from GLOBALDATA.EXCHANGE where EXCHANGE=?";
 	private static final String deleteExchangeInfoSQL = "delete from GLOBALDATA.EXCHANGE where EXCHANGE=?";
 	private static final String loadExchangeSQL = "upsert into GLOBALDATA.EXCHANGE (EXCHANGE,NAME,MIC,COUNTRY,CURRENCY,TRACK) values (?,?,?,?,?,?) ";
@@ -41,6 +41,11 @@ public class ExchangeController {
 		return dao.executeQuery(exchangeListSQL);
 	}
 	
+	@GetMapping("/track")
+	public List getTrackedExchange() throws Exception {
+		return dao.executeQuery(trackExchangeListSQL);
+	}
+		
 	@GetMapping("/load")
 	public RedirectView loadExchangeList() throws Exception {
 		List<Object[]> data = new ArrayList<>();
@@ -78,11 +83,6 @@ public class ExchangeController {
 	public List setTrackExchange(@PathVariable("exchange") String exchange) throws Exception {
 		dao.execute(trackUntrackExchangeSQL, exchange,"Y");
 		return dao.executeQuery(exchangeInfoSQL,exchange);
-	}
-	
-	@GetMapping("/track")
-	public List getTrackedExchange() throws Exception {
-		return dao.executeQuery(trackExchangeListSQL);
 	}
 	
 	@GetMapping("/untrack/{exchange}")

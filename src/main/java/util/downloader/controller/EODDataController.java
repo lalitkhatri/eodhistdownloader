@@ -60,12 +60,25 @@ public class EODDataController {
 			@RequestParam(required = false, defaultValue = "2012-01-01") String from, 
 			@RequestParam(required = false, defaultValue = "2032-05-01") String to,
 			@RequestParam(required = false, defaultValue = "d") String freq) throws Exception  {
-		List<Ticker> ticker = dao.executeQuery(tickerListSQL, tickerMapper, exchange.toUpperCase());
-		for (Ticker a : ticker) {
-			executor.execute(new EODDataLoader(exchange.toUpperCase(), a.getCode(), freq, a.getCountry(),from,to));
+		List<Ticker> ticker;
+		if(exchange.equalsIgnoreCase("ALL")) {
+		
+			List<Map<String,Object>> trackedExchange = dao.executeQuery(ExchangeController.trackExchangeListSQL);
+			for (Map<String, Object> map : trackedExchange) {
+				exchange = map.get("EXCHANGE").toString();
+				ticker = dao.executeQuery(tickerListSQL, tickerMapper, exchange.toUpperCase());
+				for (Ticker a : ticker) {
+					executor.execute(new EODDataLoader(exchange.toUpperCase(), a.getCode(), freq, a.getCountry(),from,to));
+				}
+			}
+		}else {
+			ticker = dao.executeQuery(tickerListSQL, tickerMapper, exchange.toUpperCase());
+			for (Ticker a : ticker) {
+				executor.execute(new EODDataLoader(exchange.toUpperCase(), a.getCode(), freq, a.getCountry(),from,to));
+			}
+			
 		}
 		return "Started Data Load for "+exchange;
-		
 	}
 	
 	@GetMapping("/load/{exchange}/{symbol}")
@@ -82,10 +95,25 @@ public class EODDataController {
 		return dao.executeQuery(countEODData);
 	}
 	
-	@GetMapping("/bulk/{exchange}")
-	public String bulkLoadData(@PathVariable("exchange") String exchange, String date) throws Exception  {
-		List<Object[]> newData = new ArrayList<>();
+	@GetMapping("/bulk")
+	public String bulkLoadData(String exchange, String date) throws Exception  {
+		if(exchange.equalsIgnoreCase("ALL")) {
+			List<Map<String,Object>> trackedExchange = dao.executeQuery(ExchangeController.trackExchangeListSQL);
+			for (Map<String, Object> map : trackedExchange) {
+				String exch = map.get("EXCHANGE").toString();
+				bulkLoadPerExchange(exch,date);
+			}
+		}else
+		{
+			bulkLoadPerExchange(exchange,date);
+		}
+			
+		return "Data Loaded for "+exchange + " - " + date ;
 		
+	}
+	
+	private void bulkLoadPerExchange(String exchange, String date) throws Exception {
+		List<Object[]> newData = new ArrayList<>();
 		Map<String,EODData> prevData = getPrevDateData(exchange, date);
 		URL url = new URL("https://eodhistoricaldata.com/api/eod-bulk-last-day/"+exchange.toUpperCase()+"?api_token="+API_TOKEN+"&date="+date+"&fmt=json");
 //		System.out.println(url.toString());
@@ -125,8 +153,7 @@ public class EODDataController {
 			dao.executeBatch(loadEODData, newData);
 		}
 		conn.disconnect();
-		return "Data Loaded for "+exchange +" - "+newData.size();
-		
+		System.out.println("Data Loaded for "+exchange + " - " + date +" - " + newData.size());
 	}
 	
 	private Map<String,EODData> getPrevDateData(String exchange,String date) throws Exception{

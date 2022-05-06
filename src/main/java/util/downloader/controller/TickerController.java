@@ -8,6 +8,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,6 +46,15 @@ public class TickerController {
 	@GetMapping("/list/{exchange}")
 	public List getTickerList(@PathVariable("exchange") String exchange) throws Exception {
 		return dao.executeQuery(tickerListSQL,exchange);
+	}
+	
+	@GetMapping("/bulk")
+	public String bulkLoadTicker() throws Exception {
+		List<Map<String, Object>> exchangeList = dao.executeQuery(ExchangeController.trackExchangeListSQL);
+		for (Map<String, Object> map : exchangeList) {
+			loadTickerList(map.get("EXCHANGE").toString());
+		}
+		return "Loaded ticker for all tracked exchanges";
 	}
 	
 	@GetMapping("/load/{exchange}")
@@ -103,5 +113,5 @@ public class TickerController {
 		dao.execute(deleteTickerInfoSQL, exchange,symbol);
 		return "Deleted Exchange - "+ symbol + "."+exchange;
 	}
-	
+		
 }
