@@ -1,6 +1,14 @@
 package util.downloader.controller;
 
 import static util.downloader.util.Constants.API_TOKEN;
+import static util.downloader.util.SQL.deleteTickerInfoSQL;
+import static util.downloader.util.SQL.loadTickerSQL;
+import static util.downloader.util.SQL.tickerCountSQL;
+import static util.downloader.util.SQL.tickerInfoSQL;
+import static util.downloader.util.SQL.tickerListSQL;
+import static util.downloader.util.SQL.trackExchangeListSQL;
+import static util.downloader.util.SQL.trackUntrackTickerSQL;
+import static util.downloader.util.SQL.trackedTickerListSQL;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -30,13 +38,6 @@ public class TickerController {
 	@Autowired
 	private PhoenixDAO dao;
 	
-	private static final String tickerCountSQL = "select exchange,count(1) from GLOBALDATA.TICKER where TYPE in ('Common Stock','INDEX', 'Currency' ) group by exchange order by exchange";
-	private static final String tickerListSQL = "select * from GLOBALDATA.TICKER where EXCHANGE=?";
-	private static final String tickerInfoSQL = "select * from GLOBALDATA.TICKER where EXCHANGE=? and SYMBOL=?";
-	private static final String deleteTickerInfoSQL = "delete from GLOBALDATA.TICKER where EXCHANGE=? and SYMBOL=?";
-	private static final String trackedTickerListSQL = "select * from GLOBALDATA.TICKER where TRACK='Y'";
-	private static final String loadTickerSQL = "upsert into GLOBALDATA.TICKER (SYMBOL,NAME,EXCHANGE,COUNTRY,CURRENCY,TYPE,TRACK) values (?,?,?,?,?,?,?) ";
-	private static final String trackUntrackTickerSQL = "upsert into GLOBALDATA.TICKER (EXCHANGE,SYMBOL,TRACK) values (?,?,?) ";
 	
 	@GetMapping("/count")
 	public List getTickerCount() throws Exception {
@@ -50,7 +51,7 @@ public class TickerController {
 	
 	@GetMapping("/bulk")
 	public String bulkLoadTicker() throws Exception {
-		List<Map<String, Object>> exchangeList = dao.executeQuery(ExchangeController.trackExchangeListSQL);
+		List<Map<String, Object>> exchangeList = dao.executeQuery(trackExchangeListSQL);
 		for (Map<String, Object> map : exchangeList) {
 			loadTickerList(map.get("EXCHANGE").toString());
 		}

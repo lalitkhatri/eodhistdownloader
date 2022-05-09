@@ -1,19 +1,22 @@
 package util.downloader.controller;
 
 import static util.downloader.util.Constants.API_TOKEN;
+import static util.downloader.util.SQL.countEODData;
+import static util.downloader.util.SQL.eodDataForPrevDate;
+import static util.downloader.util.SQL.loadEODData;
+import static util.downloader.util.SQL.loadSplitsData;
+import static util.downloader.util.SQL.tickerListSQL;
+import static util.downloader.util.SQL.trackExchangeListSQL;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -47,18 +50,6 @@ public class EODDataController {
 	
 	private final ExecutorService executor = Executors.newFixedThreadPool(10);
 	
-	private static final String eodDataForPrevDate = "select * from GLOBALDATA.EQDATA where EXCHANGE=? and FREQ = 'D' "
-			+ "and TRADEDATE = (select max(TRADEDATE) from GLOBALDATA.EQDATA where EXCHANGE=? and TRADEDATE < ? and FREQ = 'D')";
-	
-	private static final String countEODData = "select exchange, count(distinct symbol) as sym_cnt, count(1) as data_cnt "
-			+ "from GLOBALDATA.EQDATA group by exchange";
-		
-	private static final String loadEODData = "upsert into GLOBALDATA.EQDATA (EXCHANGE, SYMBOL,TRADEDATE,FREQ,OPENPX,CLOSEPX,HIGH,LOW,PREVCLOSE,TOTTRDQTY,ADJCLOSEPX) "
-			+ "VALUES (?,?,?,?,?,?,?,?,?,?,?)  ";
-	private static final String tickerListSQL = "select * from GLOBALDATA.TICKER where EXCHANGE=? and TYPE in ('Common Stock','INDEX', 'Currency' )";
-	
-	private static final String loadSplitsData = "upsert into GLOBALDATA.SPLITS (EXCHANGE, SYMBOL,TRADEDATE,RATIO) VALUES (?,?,?,?) ";
-			
 	@GetMapping("/load/{exchange}")
 	public String loadData(@PathVariable("exchange") String exchange, 
 			@RequestParam(required = false, defaultValue = "2012-01-01") String from, 
@@ -67,7 +58,7 @@ public class EODDataController {
 		List<Ticker> ticker;
 		if(exchange.equalsIgnoreCase("ALL")) {
 		
-			List<Map<String,Object>> trackedExchange = dao.executeQuery(ExchangeController.trackExchangeListSQL);
+			List<Map<String,Object>> trackedExchange = dao.executeQuery(trackExchangeListSQL);
 			for (Map<String, Object> map : trackedExchange) {
 				exchange = map.get("EXCHANGE").toString();
 				ticker = dao.executeQuery(tickerListSQL, tickerMapper, exchange.toUpperCase());
@@ -103,7 +94,7 @@ public class EODDataController {
 	public String bulkLoadData(String exchange, 
 			@RequestParam(required = false, defaultValue = "2012-01-01") String from, 
 			@RequestParam(required = false, defaultValue = "2032-01-01") String to) throws Exception  {
-		List<Map<String,Object>> trackedExchange = dao.executeQuery(ExchangeController.trackExchangeListSQL);
+		List<Map<String,Object>> trackedExchange = dao.executeQuery(trackExchangeListSQL);
 		while(from !=null) {
 			if(exchange.equalsIgnoreCase("ALL")) {
 				for (Map<String, Object> map : trackedExchange) {

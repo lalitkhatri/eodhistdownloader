@@ -1,5 +1,13 @@
 package util.downloader.controller;
 
+import static util.downloader.util.Constants.API_TOKEN;
+import static util.downloader.util.SQL.deleteExchangeInfoSQL;
+import static util.downloader.util.SQL.exchangeInfoSQL;
+import static util.downloader.util.SQL.exchangeListSQL;
+import static util.downloader.util.SQL.loadExchangeSQL;
+import static util.downloader.util.SQL.trackExchangeListSQL;
+import static util.downloader.util.SQL.trackUntrackExchangeSQL;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
@@ -18,7 +26,6 @@ import com.google.gson.Gson;
 
 import util.downloader.dao.PhoenixDAO;
 import util.downloader.model.Exchange;
-import static util.downloader.util.Constants.*;
 
 
 @SuppressWarnings("rawtypes")
@@ -28,13 +35,6 @@ public class ExchangeController {
 	
 	@Autowired
 	private PhoenixDAO dao;
-	
-	private static final String exchangeListSQL = "select * from GLOBALDATA.EXCHANGE";
-	public static final String trackExchangeListSQL = "select * from GLOBALDATA.EXCHANGE where TRACK='Y' ";
-	private static final String exchangeInfoSQL = "select * from GLOBALDATA.EXCHANGE where EXCHANGE=?";
-	private static final String deleteExchangeInfoSQL = "delete from GLOBALDATA.EXCHANGE where EXCHANGE=?";
-	private static final String loadExchangeSQL = "upsert into GLOBALDATA.EXCHANGE (EXCHANGE,NAME,MIC,COUNTRY,CURRENCY,TRACK) values (?,?,?,?,?,?) ";
-	private static final String trackUntrackExchangeSQL = "upsert into GLOBALDATA.EXCHANGE (EXCHANGE,TRACK) values (?,?) ";
 	
 	@GetMapping("/list")
 	public List getExchangeList() throws Exception {
