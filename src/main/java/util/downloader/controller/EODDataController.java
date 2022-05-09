@@ -6,7 +6,10 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +32,7 @@ import util.downloader.mapper.TickerMapper;
 import util.downloader.model.EODData;
 import util.downloader.model.SplitData;
 import util.downloader.model.Ticker;
+import util.downloader.util.UtilityMethods;
 
 @SuppressWarnings({"unchecked","rawtypes"})
 @RestController
@@ -96,19 +100,23 @@ public class EODDataController {
 	}
 	
 	@GetMapping("/bulk")
-	public String bulkLoadData(String exchange, String date) throws Exception  {
-		if(exchange.equalsIgnoreCase("ALL")) {
-			List<Map<String,Object>> trackedExchange = dao.executeQuery(ExchangeController.trackExchangeListSQL);
-			for (Map<String, Object> map : trackedExchange) {
-				String exch = map.get("EXCHANGE").toString();
-				bulkLoadPerExchange(exch,date);
+	public String bulkLoadData(String exchange, 
+			@RequestParam(required = false, defaultValue = "2012-01-01") String from, 
+			@RequestParam(required = false, defaultValue = "2032-01-01") String to) throws Exception  {
+		List<Map<String,Object>> trackedExchange = dao.executeQuery(ExchangeController.trackExchangeListSQL);
+		while(from !=null) {
+			if(exchange.equalsIgnoreCase("ALL")) {
+				for (Map<String, Object> map : trackedExchange) {
+					String exch = map.get("EXCHANGE").toString();
+					bulkLoadPerExchange(exch,from);
+				}
+			}else
+			{
+				bulkLoadPerExchange(exchange,from);
 			}
-		}else
-		{
-			bulkLoadPerExchange(exchange,date);
+			from = UtilityMethods.getNextBusinessDate(from,to);
 		}
-			
-		return "Data Loaded for "+exchange + " - " + date ;
+		return "Data Loaded for "+exchange  ;
 		
 	}
 	
