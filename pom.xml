@@ -15,6 +15,8 @@
 	<name>datamigration</name>
 	<properties>
 		<java.version>1.8</java.version>
+		<sparkVersion>3.2.2</sparkVersion>
+		<janino.version>3.0.16</janino.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -22,12 +24,6 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         
-		<dependency>
-			<groupId>org.apache.phoenix</groupId>
-			<artifactId>phoenix-client</artifactId>
-			<version>4.15.0-HBase-1.5</version>
-		</dependency>
-		
 		<dependency>
 			<groupId>com.google.code.gson</groupId>
 			<artifactId>gson</artifactId>
@@ -38,6 +34,28 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-core_2.13</artifactId>
+			<version>${sparkVersion}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-sql_2.13</artifactId>
+			<version>${sparkVersion}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.codehaus.janino</groupId>
+					<artifactId>commons-compiler</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.codehaus.janino</groupId>
+			<artifactId>commons-compiler</artifactId>
+			<version>${janino.version}</version>
 		</dependency>
 		
 	</dependencies>

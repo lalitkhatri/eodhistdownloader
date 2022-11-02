@@ -1,31 +1,34 @@
 package util.downloader.controller;
 
+import static org.apache.spark.sql.functions.lit;
 import static util.downloader.util.Constants.API_TOKEN;
-import static util.downloader.util.SQL.deleteExchangeInfoSQL;
-import static util.downloader.util.SQL.exchangeInfoSQL;
-import static util.downloader.util.SQL.exchangeListSQL;
-import static util.downloader.util.SQL.loadExchangeSQL;
-import static util.downloader.util.SQL.trackExchangeListSQL;
-import static util.downloader.util.SQL.trackUntrackExchangeSQL;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.ArrayList;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
+
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Encoders;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SaveMode;
+import org.apache.spark.sql.SparkSession;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.view.RedirectView;
 
-import com.google.gson.Gson;
-
-import util.downloader.dao.PhoenixDAO;
-import util.downloader.model.Exchange;
+import util.downloader.util.UtilityMethods;
 
 
 @SuppressWarnings("rawtypes")
@@ -33,22 +36,37 @@ import util.downloader.model.Exchange;
 @RequestMapping("/exchange")
 public class ExchangeController {
 	
+	@Value("${dataPath}")
+	private String dataPath;
+	
 	@Autowired
-	private PhoenixDAO dao;
+	private SparkSession spark;
+	
+	public static Dataset<Row> exchange;
+	
+	
+	@PostConstruct
+	public void init() throws IOException {
+		if(Files.list(Paths.get(dataPath+"/exchange")).count() != 0 ) {
+			exchange = spark.read().parquet(dataPath+"/exchange").cache();
+			System.out.println(" ######## Exchange count ######################  "+exchange.count());
+	//		exchange.createOrReplaceTempView("EXCHANGE");
+		}
+	}
 	
 	@GetMapping("/list")
 	public List getExchangeList() throws Exception {
-		return dao.executeQuery(exchangeListSQL);
+		return UtilityMethods.convertToMap(exchange);
 	}
 	
 	@GetMapping("/track")
 	public List getTrackedExchange() throws Exception {
-		return dao.executeQuery(trackExchangeListSQL);
+		Dataset<Row> exchangeList = exchange.filter("track = 'Y'");
+		return UtilityMethods.convertToMap(exchangeList);
 	}
 		
 	@GetMapping("/load")
-	public RedirectView loadExchangeList() throws Exception {
-		List<Object[]> data = new ArrayList<>();
+	public List loadExchangeList() throws Exception {
 		URL url = new URL("https://eodhistoricaldata.com/api/exchanges-list/?api_token="+API_TOKEN+"&fmt=json");
 		HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 		conn.setRequestMethod("GET");
@@ -59,42 +77,46 @@ public class ExchangeController {
 		BufferedReader br = new BufferedReader(new InputStreamReader((conn.getInputStream())));
 		String output;
 		while ((output = br.readLine()) != null) {
-			Gson gson = new Gson();
-			Exchange recordArray[] = gson.fromJson(output, Exchange[].class);
-			for (int i = 0; i < recordArray.length; i++) {
-				Exchange record = recordArray[i];
-				Object[] row = new Object[6];
-				row[0] = record.getCode();
-				row[1] = record.getName();
-				row[2] = record.getOperatingMIC();
-				row[3] = record.getCountry();
-				row[4] = record.getCurrency();
-				row[5] = "N";
-				
-				data.add(row);
-			}
-			dao.executeBatch(loadExchangeSQL, data);
+			System.out.println(output);
+			List<String> jsonData = Arrays.asList(output);
+			Dataset<String> stringdataset = spark.createDataset(jsonData, Encoders.STRING());
+			exchange = spark.read().json(stringdataset);
+			exchange = exchange.coalesce(1).withColumnRenamed("Code", "EXCHANGE").withColumn("track",lit("N")).orderBy("EXCHANGE");
+			exchange.write().mode(SaveMode.Overwrite).parquet(dataPath+"/exchange");
 		}
 		conn.disconnect();
-		return new RedirectView("/exchange/list");
+		return UtilityMethods.convertToMap(exchange);
 	}
 	
 	@GetMapping("/track/{exchange}")
-	public List setTrackExchange(@PathVariable("exchange") String exchange) throws Exception {
-		dao.execute(trackUntrackExchangeSQL, exchange,"Y");
-		return dao.executeQuery(exchangeInfoSQL,exchange);
+	public List setTrackExchange(@PathVariable("exchange") String _exchange) throws Exception {
+		Dataset<Row> updated = exchange.filter("exchange = '"+_exchange+"'").withColumn("track",lit("Y"));
+		Dataset<Row> other = exchange.filter("exchange <> '"+_exchange+"'");
+		exchange = updated.union(other).coalesce(1).orderBy("EXCHANGE");
+		exchange.write().mode(SaveMode.Overwrite).parquet(dataPath+"/exchange");
+		return UtilityMethods.convertToMap(exchange);
 	}
 	
 	@GetMapping("/untrack/{exchange}")
-	public List setUntrackExchange(@PathVariable("exchange") String exchange) throws Exception {
-		dao.execute(trackUntrackExchangeSQL, exchange,"N");
-		return dao.executeQuery(exchangeInfoSQL,exchange);
+	public List setUntrackExchange(@PathVariable("exchange") String _exchange) throws Exception {
+		Dataset<Row> updated = exchange.filter("exchange = '"+_exchange+"'").withColumn("track",lit("N"));
+		Dataset<Row> other = exchange.filter("exchange <> '"+_exchange+"'");
+		exchange = updated.union(other).coalesce(1).orderBy("EXCHANGE");
+		exchange.write().mode(SaveMode.Overwrite).parquet(dataPath+"/exchange");
+		return UtilityMethods.convertToMap(exchange);
 	}
 	
 	@GetMapping("/delete/{exchange}")
-	public String setDeleteExchange(@PathVariable("exchange") String exchange) throws Exception {
-		dao.execute(deleteExchangeInfoSQL, exchange);
-		return "Deleted Exchange - "+ exchange;
+	public List setDeleteExchange(@PathVariable("exchange") String _exchange) throws Exception {
+		exchange = exchange.filter("exchange <> '"+_exchange+"'").coalesce(1).orderBy("EXCHANGE");
+		exchange.write().mode(SaveMode.Overwrite).parquet(dataPath+"/exchange");
+		return UtilityMethods.convertToMap(exchange);
 	}
+	
+	@PreDestroy
+    public void destroy() {
+		spark.clearActiveSession();
+        spark.close();
+    }
 	
 }

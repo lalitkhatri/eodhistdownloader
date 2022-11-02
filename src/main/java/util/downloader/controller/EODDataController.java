@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.google.gson.Gson;
 
-import util.downloader.dao.PhoenixDAO;
+import util.downloader.dao.ParquetDAO;
 import util.downloader.mapper.EODDataMapper;
 import util.downloader.mapper.TickerMapper;
 import util.downloader.model.EODData;
@@ -43,7 +43,7 @@ import util.downloader.util.UtilityMethods;
 public class EODDataController {
 	
 	@Autowired
-	private PhoenixDAO dao;
+	private ParquetDAO dao;
 	
 	@Autowired
 	private TickerMapper tickerMapper;
@@ -149,7 +149,7 @@ public class EODDataController {
 			newData.add(row);
 		}
 		if(newData.size()>0) {
-			dao.executeBatch(loadEODData, newData);
+			dao.executeQuery(loadEODData, newData);
 		}
 		conn.disconnect();
 		System.out.println("Data Loaded for "+exchange + " - " + date +" - " + newData.size());
@@ -218,7 +218,7 @@ public class EODDataController {
 				}
 				System.out.println("Loading data for "+symbol+"."+exchange+" - "+data.size()+" - "+ Instant.now());
 				if(data.size()>0) {
-					dao.executeBatch(loadEODData, data);
+					dao.executeQuery(loadEODData, data);
 				}
 			}
 			conn.disconnect();
@@ -268,7 +268,7 @@ public class EODDataController {
 				data.add(row);
 			}
 			if(data.size()>0) {
-				dao.executeBatch(loadSplitsData, data);
+				dao.executeQuery(loadSplitsData, data);
 			}
 			conn.disconnect();
 		}

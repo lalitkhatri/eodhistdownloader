@@ -1,33 +1,34 @@
 package util.downloader.controller;
 
+import static org.apache.spark.sql.functions.lit;
 import static util.downloader.util.Constants.API_TOKEN;
-import static util.downloader.util.SQL.deleteTickerInfoSQL;
-import static util.downloader.util.SQL.loadTickerSQL;
-import static util.downloader.util.SQL.tickerCountSQL;
-import static util.downloader.util.SQL.tickerInfoSQL;
-import static util.downloader.util.SQL.tickerListSQL;
-import static util.downloader.util.SQL.trackExchangeListSQL;
-import static util.downloader.util.SQL.trackUntrackTickerSQL;
-import static util.downloader.util.SQL.trackedTickerListSQL;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
+import javax.annotation.PostConstruct;
+
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Encoders;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SaveMode;
+import org.apache.spark.sql.SparkSession;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.google.gson.Gson;
-
-import util.downloader.dao.PhoenixDAO;
-import util.downloader.model.Ticker;
+import util.downloader.util.UtilityMethods;
 
 
 @SuppressWarnings("rawtypes")
@@ -35,26 +36,46 @@ import util.downloader.model.Ticker;
 @RequestMapping("/ticker")
 public class TickerController {
 	
+	@Value("${dataPath}")
+	private String dataPath;
+	
 	@Autowired
-	private PhoenixDAO dao;
+	private SparkSession spark;
+	
+	private Dataset<Row> ticker;
+	
+	@PostConstruct
+	@GetMapping("/refresh")
+	public void init() throws IOException {
+		if(Files.list(Paths.get(dataPath+"/ticker")).count() != 0 ) {
+			ticker = spark.read().parquet(dataPath+"/ticker").cache();
+			System.out.println(" ############# Ticker Count #############  "+ticker.count());
+	//		ticker.createOrReplaceTempView("TICKER");
+		}
+
+	}
 	
 	
 	@GetMapping("/count")
 	public List getTickerCount() throws Exception {
-		return dao.executeQuery(tickerCountSQL);
+		return UtilityMethods.convertToMap(ticker.groupBy("EXCHANGE").count().orderBy("EXCHANGE"));
 	}
 	
 	@GetMapping("/list/{exchange}")
 	public List getTickerList(@PathVariable("exchange") String exchange) throws Exception {
-		return dao.executeQuery(tickerListSQL,exchange);
+		Dataset<Row> tickerList = ticker.filter("exchange = '"+exchange+"'");
+		tickerList.count();
+		return UtilityMethods.convertToMap(tickerList);
 	}
 	
 	@GetMapping("/bulk")
 	public String bulkLoadTicker() throws Exception {
-		List<Map<String, Object>> exchangeList = dao.executeQuery(trackExchangeListSQL);
-		for (Map<String, Object> map : exchangeList) {
-			loadTickerList(map.get("EXCHANGE").toString());
-		}
+		List<Row> exchangeList = ExchangeController.exchange.filter("track = 'Y'").collectAsList();
+		for (Row row : exchangeList) {
+			int i = row.fieldIndex("EXCHANGE");
+			System.out.println("############## Downloading ticker for - "+row.getString(i));
+			loadTickerList(row.getString(i));
+		}					
 		return "Loaded ticker for all tracked exchanges";
 	}
 	
@@ -71,48 +92,53 @@ public class TickerController {
 		BufferedReader br = new BufferedReader(new InputStreamReader((conn.getInputStream())));
 		String output;
 		while ((output = br.readLine()) != null) {
-			Gson gson = new Gson();
-			Ticker recordArray[] = gson.fromJson(output, Ticker[].class);
-			for (int i = 0; i < recordArray.length; i++) {
-				Ticker record = recordArray[i];
-				Object[] row = new Object[7];
-				row[0] = record.getCode();
-				row[1] = record.getName();
-				row[2] = record.getExchange();
-				row[3] = record.getCountry();
-				row[4] = record.getCurrency();
-				row[5] = record.getType();
-				row[6] = "N";
-				
-				data.add(row);
-			}
-			dao.executeBatch(loadTickerSQL, data);
+			List<String> jsonData = Arrays.asList(output);
+			Dataset<String> stringdataset = spark.createDataset(jsonData, Encoders.STRING());
+			Dataset<Row> tickerList = spark.read().json(stringdataset);
+			ticker = tickerList.coalesce(1).withColumnRenamed("Code", "SYMBOL").withColumn("track",lit("N")).orderBy("EXCHANGE","SYMBOL");
+			ticker.write().partitionBy("EXCHANGE").mode(SaveMode.Overwrite).parquet(dataPath+"/ticker");
 		}
+		init();
+		System.out.println("################# Ticker List size after "+exchange+" ############## "+ ticker.count());
 		conn.disconnect();
-		return dao.executeQuery(tickerListSQL,exchange);
-	}
-	
-	@GetMapping("/track/{exchange}/{symbol}")
-	public List setTrackTicker(@PathVariable("exchange") String exchange,@PathVariable("symbol") String symbol) throws Exception {
-		dao.execute(trackUntrackTickerSQL, exchange,symbol,"Y");
-		return dao.executeQuery(tickerInfoSQL,exchange,symbol);
+		return null;
 	}
 	
 	@GetMapping("/track")
 	public List getTrackedExchange() throws Exception {
-		return dao.executeQuery(trackedTickerListSQL);
+		Dataset<Row> tickerList = ticker.filter("track = 'Y'");
+		tickerList.count();
+		return UtilityMethods.convertToMap(tickerList);
 	}
+	
+	@GetMapping("/track/{exchange}/{symbol}")
+	public List setTrackTicker(@PathVariable("exchange") String exchange,@PathVariable("symbol") String symbol) throws Exception {
+		Dataset<Row> updated = ticker.filter("exchange = '"+exchange+"'").filter("symbol = '"+symbol+"'").withColumn("track",lit("Y"));
+		Dataset<Row> other = ticker.filter("exchange = '"+exchange+"'").filter("symbol <> '"+symbol+"'");
+		Dataset<Row> otherExchange = ticker.filter("exchange <> '"+exchange+"'");
+		ticker = updated.union(other).union(otherExchange).coalesce(1).orderBy("EXCHANGE","SYMBOL");
+		ticker.write().partitionBy("EXCHANGE").mode(SaveMode.Overwrite).parquet(dataPath+"/ticker");
+		return UtilityMethods.convertToMap(ticker);
+	}
+	
 	
 	@GetMapping("/untrack/{exchange}/{symbol}")
 	public List setUntrackExchange(@PathVariable("exchange") String exchange,@PathVariable("symbol") String symbol) throws Exception {
-		dao.execute(trackUntrackTickerSQL, exchange,"N");
-		return dao.executeQuery(tickerInfoSQL,exchange,symbol);
+		Dataset<Row> updated = ticker.filter("exchange = '"+exchange+"'").filter("symbol = '"+symbol+"'").withColumn("track",lit("Y"));
+		Dataset<Row> other = ticker.filter("exchange = '"+exchange+"'").filter("symbol <> '"+symbol+"'");
+		Dataset<Row> otherExchange = ticker.filter("exchange <> '"+exchange+"'");
+		ticker = updated.union(other).union(otherExchange).coalesce(1).orderBy("EXCHANGE","SYMBOL");
+		ticker.write().partitionBy("EXCHANGE").mode(SaveMode.Overwrite).parquet(dataPath+"/ticker");
+		return UtilityMethods.convertToMap(ticker);
 	}
 	
 	@GetMapping("/delete/{exchange}/{symbol}")
-	public String setDeleteExchange(@PathVariable("exchange") String exchange,@PathVariable("symbol") String symbol) throws Exception {
-		dao.execute(deleteTickerInfoSQL, exchange,symbol);
-		return "Deleted Exchange - "+ symbol + "."+exchange;
+	public List setDeleteExchange(@PathVariable("exchange") String exchange,@PathVariable("symbol") String symbol) throws Exception {
+		Dataset<Row> other = ticker.filter("exchange = '"+exchange+"'").filter("symbol <> '"+symbol+"'");
+		Dataset<Row> otherExchange = ticker.filter("exchange <> '"+exchange+"'");
+		ticker = other.union(otherExchange).coalesce(1).orderBy("EXCHANGE","SYMBOL");
+		ticker.write().partitionBy("EXCHANGE").mode(SaveMode.Overwrite).parquet(dataPath+"/ticker");
+		return UtilityMethods.convertToMap(ticker);
 	}
 		
 }
