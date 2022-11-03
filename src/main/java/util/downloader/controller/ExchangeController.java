@@ -46,6 +46,7 @@ public class ExchangeController {
 	
 	
 	@PostConstruct
+	@GetMapping("/refresh")
 	public void init() throws IOException {
 		if(Files.list(Paths.get(dataPath+"/exchange")).count() != 0 ) {
 			exchange = spark.read().parquet(dataPath+"/exchange").cache();

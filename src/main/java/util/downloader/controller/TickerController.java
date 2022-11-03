@@ -101,7 +101,7 @@ public class TickerController {
 		init();
 		System.out.println("################# Ticker List size after "+exchange+" ############## "+ ticker.count());
 		conn.disconnect();
-		return null;
+		return UtilityMethods.convertToMap(ticker.groupBy("EXCHANGE").count().orderBy("EXCHANGE"));
 	}
 	
 	@GetMapping("/track")
