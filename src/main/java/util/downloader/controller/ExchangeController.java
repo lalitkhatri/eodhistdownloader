@@ -116,7 +116,6 @@ public class ExchangeController {
 	
 	@PreDestroy
     public void destroy() {
-		spark.clearActiveSession();
         spark.close();
     }
 	

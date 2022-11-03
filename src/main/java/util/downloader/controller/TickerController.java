@@ -118,7 +118,7 @@ public class TickerController {
 		Dataset<Row> otherExchange = ticker.filter("exchange <> '"+exchange+"'");
 		ticker = updated.union(other).union(otherExchange).coalesce(1).orderBy("EXCHANGE","SYMBOL");
 		ticker.write().partitionBy("EXCHANGE").mode(SaveMode.Overwrite).parquet(dataPath+"/ticker");
-		return UtilityMethods.convertToMap(ticker);
+		return UtilityMethods.convertToMap(updated);
 	}
 	
 	
@@ -129,16 +129,23 @@ public class TickerController {
 		Dataset<Row> otherExchange = ticker.filter("exchange <> '"+exchange+"'");
 		ticker = updated.union(other).union(otherExchange).coalesce(1).orderBy("EXCHANGE","SYMBOL");
 		ticker.write().partitionBy("EXCHANGE").mode(SaveMode.Overwrite).parquet(dataPath+"/ticker");
-		return UtilityMethods.convertToMap(ticker);
+		return UtilityMethods.convertToMap(updated);
+	}
+	
+	@GetMapping("/delete/{exchange}")
+	public List setDeleteExchangeTickers(@PathVariable("exchange") String exchange) throws Exception {
+		ticker = ticker.filter("exchange <> '"+exchange+"'").coalesce(1).orderBy("EXCHANGE","SYMBOL");
+		ticker.write().partitionBy("EXCHANGE").mode(SaveMode.Overwrite).parquet(dataPath+"/ticker");
+		return UtilityMethods.convertToMap(ticker.groupBy("EXCHANGE").count());
 	}
 	
 	@GetMapping("/delete/{exchange}/{symbol}")
-	public List setDeleteExchange(@PathVariable("exchange") String exchange,@PathVariable("symbol") String symbol) throws Exception {
+	public List setDeleteTicker(@PathVariable("exchange") String exchange,@PathVariable("symbol") String symbol) throws Exception {
 		Dataset<Row> other = ticker.filter("exchange = '"+exchange+"'").filter("symbol <> '"+symbol+"'");
 		Dataset<Row> otherExchange = ticker.filter("exchange <> '"+exchange+"'");
 		ticker = other.union(otherExchange).coalesce(1).orderBy("EXCHANGE","SYMBOL");
 		ticker.write().partitionBy("EXCHANGE").mode(SaveMode.Overwrite).parquet(dataPath+"/ticker");
-		return UtilityMethods.convertToMap(ticker);
+		return UtilityMethods.convertToMap(ticker.filter("exchange = '"+exchange+"'").groupBy("EXCHANGE").count());
 	}
 		
 }
