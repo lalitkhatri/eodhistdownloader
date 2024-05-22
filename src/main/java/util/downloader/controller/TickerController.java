@@ -42,7 +42,7 @@ public class TickerController {
 	@Autowired
 	private SparkSession spark;
 	
-	private Dataset<Row> ticker;
+	public static Dataset<Row> ticker;
 	
 	@PostConstruct
 	@GetMapping("/refresh")
