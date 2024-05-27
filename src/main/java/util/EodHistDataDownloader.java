@@ -21,6 +21,11 @@ import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
+//import software.amazon.awssdk.awscore.exception.AwsServiceException;
+//import software.amazon.awssdk.core.sync.RequestBody;
+//import software.amazon.awssdk.regions.Region;
+//import software.amazon.awssdk.services.s3.S3Client;
+//import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import util.downloader.model.EODData;
 
 public class EodHistDataDownloader implements RequestHandler<ScheduledEvent, String> {
@@ -29,6 +34,7 @@ public class EodHistDataDownloader implements RequestHandler<ScheduledEvent, Str
 	public String handleRequest(ScheduledEvent event, Context context) {
 		System.out.println(Instant.now());
 		LambdaLogger logger = context.getLogger();
+		
 		String exchange = "US";
 		String ticker  = "MCD";
 		String apiKey = "demo";
@@ -39,16 +45,10 @@ public class EodHistDataDownloader implements RequestHandler<ScheduledEvent, Str
 			String jsonResult = getTimeseries(ticker,exchange,apiKey,fromDt,toDt);
 			
 			String processedTimeseries = processTimeseries(jsonResult);
-			
-			File dir = new File(path);
-			if (!dir.exists()){
-				dir.mkdirs();
-			}
-			GZIPOutputStream os = new GZIPOutputStream(new FileOutputStream(new File(path, ticker+".json.gz")));
-			os.write(processedTimeseries.getBytes());
-			os.close();
+//			ZipOutputStream zipOut = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(new File(path,".zip"))));
+			writeTimeseries(path,ticker, processedTimeseries);
 			logger.log(processedTimeseries.substring(0,500));
-			
+//			putToS3(new File(path,ticker+".json.gz"),logger);
 		} catch (Exception e) {
 			logger.log("ERROR while processing request : "+e.getMessage());
 			e.printStackTrace();
@@ -57,6 +57,26 @@ public class EodHistDataDownloader implements RequestHandler<ScheduledEvent, Str
 		return null;
 	}
  
+//	private void putToS3(File file, LambdaLogger logger) {
+//		S3Client s3Client = S3Client.builder().region(Region.US_EAST_1).build();
+//		Map<String, String> metadata = new HashMap<>();
+//		metadata.put("Content-Length", Long.toString(file.length()));
+//
+//		PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+//													.bucket("eodhistdata")
+//													.key(file.getName())
+//													.metadata(metadata)
+//													.build();
+//
+//		// Uploading to S3 destination bucket
+//		logger.log("Writing to: " + "arn:aws:s3:::eodhistdata" + "/" + file.getName());
+//		try {
+//			s3Client.putObject(putObjectRequest, RequestBody.fromFile(file));
+//		} catch (AwsServiceException e) {
+//			logger.log(e.awsErrorDetails().errorMessage());
+//		}
+//	}
+
 	private String processTimeseries(String jsonResult) {
 		Gson gson = new Gson();
 		Type listType = new TypeToken<List<EODData>>() {}.getType();
@@ -120,6 +140,16 @@ public class EodHistDataDownloader implements RequestHandler<ScheduledEvent, Str
 		String jsonResult = br.readLine();
 		conn.disconnect();
 		return jsonResult;
+	}
+	
+	private void writeTimeseries(String path,String ticker, String processedTimeseries) throws IOException{
+		File dir = new File(path);
+		if (!dir.exists()){
+			dir.mkdirs();
+		}
+		GZIPOutputStream os = new GZIPOutputStream(new FileOutputStream(new File(path, ticker+".json.gz")));
+		os.write(processedTimeseries.getBytes());
+		os.close();
 	}
 	
 //	public static void main(String[] args) {
