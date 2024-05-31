@@ -17,6 +17,7 @@ import javax.annotation.PostConstruct;
 import org.apache.spark.sql.Column;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SaveMode;
 import org.apache.spark.sql.SparkSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,8 +49,8 @@ public class EODDataController {
 	@GetMapping("/refresh")
 	public void init() throws IOException {
 		if(Files.list(Paths.get(dataPath+"/eqdata")).count() != 0 ) {
-			eqdata = spark.read().parquet(dataPath+"/eqdata").cache();
-//			System.out.println(" ############# Ticker Count #############  "+eqdata.count());
+			eqdata = spark.read().parquet(dataPath+"/eqdata");
+//			System.out.println(" ############# EODData Count #############  "+eqdata.count());
 		}
 
 	}
@@ -81,6 +82,24 @@ public class EODDataController {
 	@GetMapping("/count")
 	public List getDataCount() throws Exception {
 		return UtilityMethods.convertToMap(eqdata.groupBy("EXCHANGE").count().orderBy("EXCHANGE"));
+	}
+	
+	@GetMapping("/data/{exchange}")
+	public List getDataForExchange(@PathVariable("exchange") String exchange,
+			@RequestParam(required = false, defaultValue = "D") String freq) throws Exception {
+		Dataset<Row> eodData =  eqdata.filter("exchange = '"+exchange+"'")
+				.filter("freq = '"+freq+"'")
+				.cache();
+		return UtilityMethods.convertToMap(eodData);
+	}
+	
+	@GetMapping("/data/{exchange}/{symbol}")
+	public List getDataForSymbol(@PathVariable("exchange") String exchange,@PathVariable("symbol") String symbol,
+			@RequestParam(required = false, defaultValue = "D") String freq) throws Exception {
+		Dataset<Row> eodData = eqdata.filter("exchange = '"+exchange+"'").filter("symbol = '"+symbol+"'")
+				.filter("freq = '"+freq+"'")
+				.cache();
+		return UtilityMethods.convertToMap(eodData);
 	}
 	
 	@GetMapping("/bulk")
@@ -118,26 +137,16 @@ public class EODDataController {
 	
 	
 	@GetMapping("/export/{exchange}")
-	public String exportData(@PathVariable("exchange") String exchange, 
-			@RequestParam(required = false, defaultValue = "2001-01-01") String from, 
-			@RequestParam(required = false, defaultValue = "2032-05-01") String to,
-			@RequestParam(required = false, defaultValue = "d") String freq) throws Exception  {
-		List<Row> tickerList = TickerController.ticker.filter("exchange = '"+exchange+"'").collectAsList();
-		for (Row row : tickerList) {
-			int i = row.fieldIndex("EXCHANGE");
-			int j = row.fieldIndex("SYMBOL");
-			System.out.println("############## Downloading ticker for - "+row.getString(i));
-			exportData(row.getString(i),row.getString(j),"2001-01-01","2032-01-01",freq);
-		}	
+	public String exportData(@PathVariable("exchange") String exchange,
+			@RequestParam(required = false, defaultValue = "D") String freq) throws Exception  {
+		eqdata.filter("exchange = '"+exchange+"'").filter("FREQ = '"+freq+"'").write().mode(SaveMode.Overwrite).option("header", "true").csv(exportPath+"/"+exchange);
 		return "Data Exported for "+exchange  ;
 	}
 	
 	@GetMapping("/export/{exchange}/{symbol}")
 	public String exportData(@PathVariable("exchange") String exchange,@PathVariable("symbol") String symbol,
-			@RequestParam(required = false, defaultValue = "2001-01-01") String from, 
-			@RequestParam(required = false, defaultValue = "2032-01-01") String to ,
 			@RequestParam(required = false, defaultValue = "d") String freq) throws Exception  {
-		eqdata.filter("exchange = '"+exchange+"'").filter("symbol = '"+symbol+"'").write().csv(exportPath+"/"+exchange+"/"+symbol);
+		eqdata.filter("exchange = '"+exchange+"'").filter("symbol = '"+symbol+"'").write().mode(SaveMode.Overwrite).option("header", "true").csv(exportPath+"/"+exchange+"/"+symbol);
 		return "Data Exported for "+symbol+"."+exchange;
 	}
 	
